@@ -26,9 +26,9 @@ export function formatSubmissionDate(value) {
  * @param {{ submissions: Array<object>, onEdit: (submission: object) => void, onDelete: (submission: object) => void }} props - Data and action handlers.
  * @returns {JSX.Element} A responsive submission table or its empty state.
  */
-function SubmissionTable({ submissions, onEdit, onDelete }) {
+function SubmissionTable({ submissions, onEdit, onDelete, emptyMessage = 'No submissions yet.' }) {
   if (submissions.length === 0) {
-    return <p className="submissions-empty">No submissions yet.</p>;
+    return <p className="submissions-empty">{emptyMessage}</p>;
   }
 
   return (
@@ -81,6 +81,7 @@ SubmissionTable.propTypes = {
   })).isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  emptyMessage: PropTypes.string,
 };
 
 export default SubmissionTable;

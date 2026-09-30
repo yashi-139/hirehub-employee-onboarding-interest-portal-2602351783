@@ -3,8 +3,12 @@ import {
   SUBMISSIONS_STORAGE_KEY,
   addSubmission,
   deleteSubmission,
+  filterSubmissions,
+  getSubmissionDepartments,
   getSubmissions,
   isEmailDuplicate,
+  matchesSubmissionFilters,
+  normalizeSubmissionQuery,
   saveSubmissions,
   updateSubmission,
 } from './storage';
@@ -16,6 +20,15 @@ const firstSubmission = {
   mobile: '1234567890',
   department: 'Engineering',
   submittedAt: '2026-03-04T12:00:00.000Z',
+};
+
+const secondSubmission = {
+  id: 'record-2',
+  fullName: 'Noah Lee',
+  email: 'noah@example.com',
+  mobile: '2223334444',
+  department: 'Design',
+  submittedAt: '2026-03-05T12:00:00.000Z',
 };
 
 describe('submission storage', () => {
@@ -72,5 +85,40 @@ describe('submission storage', () => {
     expect(deleteSubmission('missing')).toBe(false);
     expect(deleteSubmission('record-1')).toBe(true);
     expect(getSubmissions()).toEqual([]);
+  });
+
+  it('normalizes dashboard search input and handles non-string values safely', () => {
+    expect(normalizeSubmissionQuery('  Ava Smith  ')).toBe('ava smith');
+    expect(normalizeSubmissionQuery('')).toBe('');
+    expect(normalizeSubmissionQuery(null)).toBe('');
+  });
+
+  it('returns sorted unique department options from persisted submissions', () => {
+    saveSubmissions([
+      firstSubmission,
+      secondSubmission,
+      { ...firstSubmission, id: 'record-3', department: 'Engineering' },
+    ]);
+
+    expect(getSubmissionDepartments()).toEqual(['Design', 'Engineering']);
+  });
+
+  it('matches submission filters across name, email, mobile, and department', () => {
+    expect(matchesSubmissionFilters(firstSubmission, { searchTerm: 'ava' })).toBe(true);
+    expect(matchesSubmissionFilters(firstSubmission, { searchTerm: 'EXAMPLE.COM' })).toBe(true);
+    expect(matchesSubmissionFilters(firstSubmission, { searchTerm: '6789' })).toBe(true);
+    expect(matchesSubmissionFilters(firstSubmission, { searchTerm: 'missing' })).toBe(false);
+    expect(matchesSubmissionFilters(firstSubmission, { department: 'Engineering' })).toBe(true);
+    expect(matchesSubmissionFilters(firstSubmission, { department: 'Design' })).toBe(false);
+  });
+
+  it('filters submissions by combined search and department criteria without reordering', () => {
+    const filtered = filterSubmissions([firstSubmission, secondSubmission], {
+      searchTerm: 'example',
+      department: 'Design',
+    });
+
+    expect(filtered).toEqual([secondSubmission]);
+    expect(filterSubmissions([firstSubmission, secondSubmission], { searchTerm: 'zzz' })).toEqual([]);
   });
 });

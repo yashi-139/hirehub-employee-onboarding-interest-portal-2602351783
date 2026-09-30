@@ -37,6 +37,17 @@ test('candidate submission survives admin authentication, edit, delete, and relo
   await expect(page.getByText('ava@example.com')).toBeVisible();
   await expect(page.getByText('1234567890')).toBeVisible();
   await expect(page.getByText('Engineering')).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search submissions' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Department' })).toBeVisible();
+
+  await page.getByRole('searchbox', { name: 'Search submissions' }).fill('ava@example.com');
+  await expect(page.getByText('Ava Smith')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Department' }).selectOption('Engineering');
+  await expect(page.getByText('Ava Smith')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search submissions' }).fill('missing');
+  await expect(page.getByText('No submissions match the current filters.')).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.getByText('Ava Smith')).toBeVisible();
 
   await page.getByRole('button', { name: 'Edit' }).click();
   await page.getByRole('dialog', { name: 'Edit Submission' }).getByLabel('Full Name').fill('Ava Jones');

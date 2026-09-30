@@ -4,7 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import AdminLogin from '../components/AdminLogin';
 import EditModal from '../components/EditModal';
 import SubmissionTable, { formatSubmissionDate } from '../components/SubmissionTable';
-import { deleteSubmission, getSubmissions, updateSubmission } from '../utils/storage';
+import {
+  deleteSubmission,
+  filterSubmissions,
+  getSubmissionDepartments,
+  getSubmissions,
+  updateSubmission,
+} from '../utils/storage';
 
 /** Return whether the current browser session has local administrator access. */
 function isAuthenticated() {
@@ -102,28 +108,43 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [authenticated, setAuthenticated] = useState(isAuthenticated);
   const [submissions, setSubmissions] = useState(getSubmissions);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
 
+  const departmentOptions = useMemo(() => getSubmissionDepartments(submissions), [submissions]);
+
+  const filteredSubmissions = useMemo(
+    () => filterSubmissions(submissions, { searchTerm, department: selectedDepartment }),
+    [searchTerm, selectedDepartment, submissions],
+  );
+
   const stats = useMemo(() => {
-    const dates = submissions
+    const dates = filteredSubmissions
       .map((submission) => new Date(submission.submittedAt))
       .filter((date) => !Number.isNaN(date.getTime()));
     const latest = dates.length
       ? new Date(Math.max(...dates.map((date) => date.getTime()))).toISOString()
       : '';
     return {
-      total: submissions.length,
-      departments: new Set(submissions.map((submission) => submission.department)).size,
+      total: filteredSubmissions.length,
+      departments: new Set(filteredSubmissions.map((submission) => submission.department)).size,
       latest,
     };
-  }, [submissions]);
+  }, [filteredSubmissions]);
 
   /** End the local admin session, synchronize the header, and return home. */
   function handleLogout() {
     sessionStorage.removeItem('hirehub_admin_auth');
     window.dispatchEvent(new Event('hirehub-admin-auth-change'));
     navigate('/');
+  }
+
+  /** Clear every dashboard filter and restore the full result set. */
+  function handleClearFilters() {
+    setSearchTerm('');
+    setSelectedDepartment('');
   }
 
   /** Persist a valid edit and immediately reflect it in the rendered table. */
@@ -178,11 +199,56 @@ function AdminDashboard() {
         </article>
       </div>
       <section className="submissions-section" aria-labelledby="submissions-table-title">
-        <h2 id="submissions-table-title">All Submissions</h2>
+        <div className="submissions-section-header">
+          <div>
+            <h2 id="submissions-table-title">All Submissions</h2>
+            <p className="submissions-section-copy">
+              Search candidate details or narrow the table by department without changing stored records.
+            </p>
+          </div>
+          <div className="dashboard-filters" aria-label="Dashboard filters">
+            <label className="dashboard-filter-field" htmlFor="submission-search">
+              <span>Search submissions</span>
+              <input
+                id="submission-search"
+                name="submission-search"
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by name, email, or mobile"
+              />
+            </label>
+            <label className="dashboard-filter-field" htmlFor="submission-department-filter">
+              <span>Department</span>
+              <select
+                id="submission-department-filter"
+                name="submission-department-filter"
+                value={selectedDepartment}
+                onChange={(event) => setSelectedDepartment(event.target.value)}
+              >
+                <option value="">All departments</option>
+                {departmentOptions.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="admin-secondary-button dashboard-clear-filters"
+              type="button"
+              onClick={handleClearFilters}
+              disabled={!searchTerm && !selectedDepartment}
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
         <SubmissionTable
-          submissions={submissions}
+          submissions={filteredSubmissions}
           onEdit={setEditingSubmission}
           onDelete={setDeletingSubmission}
+          emptyMessage={submissions.length === 0 ? 'No submissions yet.' : 'No submissions match the current filters.'}
         />
       </section>
       {editingSubmission && (

@@ -49,6 +49,44 @@ describe('AdminDashboard', () => {
     const summary = screen.getByLabelText('Submission summary');
     expect(within(summary).getAllByText('2')).toHaveLength(2);
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search submissions' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Department' })).toBeInTheDocument();
+  });
+
+  it('filters submissions by case-insensitive search text and updates summary totals', async () => {
+    const user = userEvent.setup();
+    signInSession();
+    localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(records));
+    renderDashboard();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search submissions' }), 'NOAH');
+
+    expect(screen.getByText('Noah Lee')).toBeInTheDocument();
+    expect(screen.queryByText('Ava Smith')).not.toBeInTheDocument();
+    const summary = screen.getByLabelText('Submission summary');
+    expect(within(summary).getByText('Total Submissions')).toBeInTheDocument();
+    expect(within(summary).getByText('Departments')).toBeInTheDocument();
+    expect(within(summary).getByText('Latest Submission')).toBeInTheDocument();
+    expect(within(summary).getByText('Mar 2, 2026')).toBeInTheDocument();
+    expect(within(summary).getAllByText('1')).toHaveLength(2);
+  });
+
+  it('combines department filtering with search and surfaces a filtered empty state that can be cleared', async () => {
+    const user = userEvent.setup();
+    signInSession();
+    localStorage.setItem(SUBMISSIONS_STORAGE_KEY, JSON.stringify(records));
+    renderDashboard();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Department' }), 'Engineering');
+    expect(screen.getByText('Ava Smith')).toBeInTheDocument();
+    expect(screen.queryByText('Noah Lee')).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search submissions' }), 'missing');
+    expect(screen.getByText('No submissions match the current filters.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByText('Ava Smith')).toBeInTheDocument();
+    expect(screen.getByText('Noah Lee')).toBeInTheDocument();
   });
 
   it('keeps persisted data unchanged when an edit is invalid or cancelled, then saves valid edits', async () => {

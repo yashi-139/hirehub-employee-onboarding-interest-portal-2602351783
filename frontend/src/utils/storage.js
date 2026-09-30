@@ -98,6 +98,75 @@ export function deleteSubmission(id) {
  * @param {Array<object>} [submissions=getSubmissions()] - Optional records to inspect.
  * @returns {boolean} Whether a matching email exists.
  */
+/**
+ * Normalize free-text filter input for case-insensitive matching.
+ *
+ * @param {string} value - Raw text input value.
+ * @returns {string} Trimmed lowercase text, or an empty string for non-strings.
+ */
+export function normalizeSubmissionQuery(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * Return the unique persisted departments in ascending display order.
+ *
+ * @param {Array<object>} [submissions=getSubmissions()] - Optional records to inspect.
+ * @returns {string[]} Sorted distinct department labels.
+ */
+export function getSubmissionDepartments(submissions = getSubmissions()) {
+  return [...new Set(
+    submissions
+      .map((submission) => (typeof submission.department === 'string' ? submission.department.trim() : ''))
+      .filter(Boolean),
+  )].sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Return whether a submission matches the provided dashboard filters.
+ *
+ * @param {object} submission - Candidate submission to evaluate.
+ * @param {{ searchTerm?: string, department?: string }} filters - Search and department filters.
+ * @returns {boolean} Whether the submission should remain visible.
+ */
+export function matchesSubmissionFilters(submission, filters = {}) {
+  const normalizedSearchTerm = normalizeSubmissionQuery(filters.searchTerm);
+  const normalizedDepartment = typeof filters.department === 'string' ? filters.department.trim() : '';
+
+  const matchesDepartment = !normalizedDepartment || submission.department === normalizedDepartment;
+  if (!matchesDepartment) {
+    return false;
+  }
+
+  if (!normalizedSearchTerm) {
+    return true;
+  }
+
+  const searchableValues = [submission.fullName, submission.email, submission.mobile]
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.toLowerCase());
+
+  return searchableValues.some((value) => value.includes(normalizedSearchTerm));
+}
+
+/**
+ * Filter persisted submissions using the current dashboard controls.
+ *
+ * @param {Array<object>} [submissions=getSubmissions()] - Optional records to filter.
+ * @param {{ searchTerm?: string, department?: string }} filters - Search and department filters.
+ * @returns {Array<object>} Visible submissions in their original order.
+ */
+export function filterSubmissions(submissions = getSubmissions(), filters = {}) {
+  return submissions.filter((submission) => matchesSubmissionFilters(submission, filters));
+}
+
+/**
+ * Check whether an email is already present, ignoring capitalization and edge whitespace.
+ *
+ * @param {string} email - Email address to look up.
+ * @param {Array<object>} [submissions=getSubmissions()] - Optional records to inspect.
+ * @returns {boolean} Whether a matching email exists.
+ */
 export function isEmailDuplicate(email, submissions = getSubmissions()) {
   if (typeof email !== 'string') {
     return false;
